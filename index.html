@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SCP – Containment Breach · Web Port (Test Room)</title>
+<style>
+  :root{--ink:#d9d9d9;--dim:#8d8d8d;--red:#b01818}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;font-family:"Courier New",Courier,monospace;color:var(--ink);-webkit-user-select:none;user-select:none}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+  #stage{position:relative;width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));container-type:size;overflow:hidden;background:#000}
+  #view{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .abs{position:absolute}
+  /* HUD */
+  #hud{position:absolute;inset:0;pointer-events:none}
+  .meter{position:absolute;left:8.2cqw;width:20.4cqw;height:2cqw;border:.2cqw solid #ccc;display:flex;padding:.25cqw;gap:0}
+  .meter i{display:block;height:100%;width:1cqw;background:#bdbdbd}
+  .meter.low i{background:#c01818}
+  .micon{position:absolute;left:4.2cqw;width:3cqw;height:3cqw;image-rendering:pixelated}
+  #msg{position:absolute;left:0;right:0;bottom:16cqw;text-align:center;font-size:2cqw;color:#fff;text-shadow:.15cqw .15cqw 0 #000;padding:0 8cqw}
+  #cross{position:absolute;left:50%;top:50%;width:.5cqw;height:.5cqw;margin:-.25cqw 0 0 -.25cqw;background:rgba(255,255,255,.55);border-radius:50%}
+  #hand{position:absolute;left:50%;top:50%;width:5cqw;height:5cqw;margin:-2.5cqw 0 0 -2.5cqw;image-rendering:pixelated;display:none;opacity:.9}
+  #pickname{position:absolute;left:0;right:0;top:55%;text-align:center;font-size:1.7cqw;color:#e6e6e6;text-shadow:.12cqw .12cqw 0 #000;display:none}
+  #held{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;text-align:center}
+  #held img.ic{width:12cqw;height:12cqw;image-rendering:pixelated;display:block;margin:0 auto}
+  #held img.doc{height:44cqh;display:block;margin:0 auto;box-shadow:0 0 2cqw #000}
+  #prog{width:29cqw;height:2cqw;border:.2cqw solid #ccc;margin:1.5cqw auto 0;padding:.25cqw;display:none}
+  #prog b{display:block;height:100%;width:0;background:repeating-linear-gradient(90deg,#bdbdbd 0 1cqw,transparent 1cqw 1.0cqw)}
+  #helpbar{position:absolute;right:1.2cqw;bottom:1cqw;font-size:1.15cqw;color:var(--dim);text-align:right;line-height:1.5}
+  #dbg{position:absolute;left:1cqw;top:1cqw;font-size:1.3cqw;line-height:1.35;color:#9f9;white-space:pre;display:none;text-shadow:.1cqw .1cqw #000}
+  #visor{position:absolute;inset:0;display:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 48%,rgba(8,10,8,.55) 78%,rgba(0,0,0,.92) 100%)}
+  #visor.haz{background:radial-gradient(ellipse at center,rgba(60,50,0,.08) 42%,rgba(20,18,0,.6) 76%,rgba(0,0,0,.95) 100%)}
+  #flash{position:absolute;inset:0;background:#fff;opacity:0}
+  #hit{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(120,0,0,0) 40%,rgba(140,0,0,.7) 100%);opacity:0}
+  /* Inventory (layout constants from DrawGUI: 70px slots, 35px spacing, 5 per row) */
+  #inv{position:absolute;inset:0;display:none;background:rgba(0,0,0,.35)}
+  #slots{position:absolute;left:50%;top:calc(50% - 6.84cqw);transform:translateX(-50%);display:grid;grid-template-columns:repeat(5,6.84cqw);column-gap:3.42cqw;row-gap:6.84cqw}
+  .slot{position:relative;width:6.84cqw;height:6.84cqw;border:.2cqw solid #cfcfcf;background:rgba(10,10,10,.82);box-shadow:inset 0 0 .6cqw #000}
+  .slot.worn{outline:.3cqw solid #c8c8c8;outline-offset:.1cqw}
+  .slot.hover{border-color:#e03030;box-shadow:0 0 0 .2cqw #e03030}
+  .slot img{position:absolute;left:50%;top:50%;width:6.25cqw;height:6.25cqw;margin:-3.125cqw 0 0 -3.125cqw;image-rendering:pixelated;pointer-events:none}
+  .slot .nm{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:.9cqw;white-space:nowrap;font-size:1.5cqw;color:#fff;text-shadow:.12cqw .12cqw #000;display:none;pointer-events:none}
+  .slot.hover .nm{display:block}
+  #drag{position:absolute;width:6.25cqw;height:6.25cqw;pointer-events:none;display:none;image-rendering:pixelated;z-index:5}
+  #invhint{position:absolute;left:0;right:0;top:calc(50% - 12cqw);text-align:center;font-size:1.4cqw;color:var(--dim)}
+  #dropzone{position:absolute;left:0;right:0;bottom:3cqw;text-align:center;font-size:1.3cqw;color:var(--dim)}
+  /* Screens */
+  .screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:rgba(0,0,0,.88);padding:3cqw;z-index:4}
+  .screen h1{font:700 3.6cqw "Courier New",monospace;letter-spacing:.3cqw;margin:0 0 .6cqw;color:#e6e6e6}
+  .screen h2{font:400 1.7cqw "Courier New",monospace;margin:0 0 2.4cqw;color:var(--dim)}
+  .screen .box{display:grid;grid-template-columns:auto auto;gap:.5cqw 2.4cqw;text-align:left;font-size:1.45cqw;margin:0 0 2.2cqw}
+  .screen .box b{color:#fff;font-weight:400;text-align:right}
+  .btn{font:700 1.8cqw "Courier New",monospace;border:.2cqw solid #cfcfcf;background:#111;color:#fff;padding:1cqw 3cqw;cursor:pointer;pointer-events:auto}
+  .btn:hover{background:#2a2a2a}
+  .legal{position:absolute;left:2cqw;right:2cqw;bottom:1.4cqw;font-size:1.05cqw;color:#777;line-height:1.45}
+  .legal a{color:#999}
+  #dead{background:rgba(0,0,0,.92)}
+  #dead h1{color:#c02020}
+  #deadmsg{max-width:62cqw;font-size:1.45cqw;line-height:1.5;margin:0 0 2.4cqw;color:#cfcfcf}
+
+  /* ---------- touch controls ---------- */
+  #touch{position:absolute;inset:0;z-index:1;display:none;touch-action:none}
+  #stage.touch.playing #touch{display:block}
+  #inv{z-index:2;touch-action:none}
+  #stickbase{position:absolute;display:none;width:14cqw;height:14cqw;margin:-7cqw 0 0 -7cqw;border:.3cqw solid rgba(255,255,255,.35);border-radius:50%;background:rgba(255,255,255,.06);pointer-events:none}
+  #stickknob{position:absolute;left:50%;top:50%;width:6cqw;height:6cqw;border-radius:50%;background:rgba(255,255,255,.35);transform:translate(-50%,-50%)}
+  #tbtns{display:none}
+  #stage.touch.playing #tbtns{display:block}
+  #stage.touch.isdead #tbtns{display:none}
+  .tb{position:absolute;z-index:6;width:9cqw;height:9cqw;border-radius:50%;border:.3cqw solid rgba(255,255,255,.55);background:rgba(20,20,20,.55);color:#eee;font:700 1.7cqw "Courier New",monospace;line-height:1.1;padding:0;touch-action:none;-webkit-user-select:none;user-select:none}
+  .tb.on{background:rgba(220,220,220,.5);color:#000}
+  .tb.sm{width:6.5cqw;height:6.5cqw;font-size:1.3cqw}
+  #stage.touch #helpbar{display:none!important}
+  #stage.touch .meter,#stage.touch .micon{bottom:auto!important}
+  #stage.touch #blinkic,#stage.touch #blinkm{top:2.2cqw}
+  #stage.touch #stamic,#stage.touch #stamm{top:6.4cqw}
+  #stage.touch .meter{left:5cqw;width:14cqw;height:1.8cqw}
+  #stage.touch .meter i{width:.65cqw}
+  #stage.touch .micon{left:1.4cqw;width:2.8cqw;height:2.8cqw}
+  #stage.touch #msg{font-size:2.5cqw;bottom:19cqw}
+  #stage.touch #pickname{font-size:2.3cqw}
+  #stage.touch #slots{grid-template-columns:repeat(5,9.5cqw);column-gap:2.6cqw;row-gap:5.5cqw;top:calc(50% - 11cqw)}
+  #stage.touch .slot{width:9.5cqw;height:9.5cqw}
+  #stage.touch .slot img{width:8.6cqw;height:8.6cqw;margin:-4.3cqw 0 0 -4.3cqw}
+  #stage.touch .slot .nm{font-size:2cqw}
+  #stage.touch #invhint{font-size:1.9cqw;top:calc(50% - 17cqw)}
+  #stage.touch #dropzone{display:none}
+  #stage.touch .screen .box.desk{display:none}
+  #stage.touch .screen h1{font-size:4cqw}
+  .box.touchonly{display:none}
+  #stage.touch .screen .box.touchonly{display:grid;font-size:2.1cqw;gap:.8cqw 2.4cqw}
+  #stage.touch .btn{font-size:2.6cqw;padding:1.4cqw 4cqw}
+  #stage.touch .screen h2{font-size:2cqw;margin-bottom:1.6cqw}
+  #stage.touch .legal{font-size:1.1cqw}
+  #rotate{display:none;position:fixed;inset:0;z-index:50;background:#000;color:#ddd;align-items:center;justify-content:center;text-align:center;font:700 5vw "Courier New",monospace;padding:8vw}
+  @media (orientation:portrait){ body.touchmode #rotate{display:flex} }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="view"></canvas>
+
+  <div id="hud">
+    <div id="visor"></div>
+    <div id="hit"></div>
+    <div id="flash"></div>
+    <div id="cross"></div>
+    <img id="hand" alt="">
+    <div id="pickname"></div>
+    <div id="held"><img class="ic" id="heldic" alt=""><img class="doc" id="helddoc" alt=""><div id="prog"><b></b></div></div>
+    <img class="micon" id="blinkic" style="bottom:7.3cqw" alt="">
+    <div class="meter" id="blinkm" style="bottom:7cqw"></div>
+    <img class="micon" id="stamic" style="bottom:3.3cqw" alt="">
+    <div class="meter" id="stamm" style="bottom:3cqw"></div>
+    <div id="msg"></div>
+    <div id="helpbar">WASD move · SHIFT sprint · C crouch · SPACE blink · TAB inventory<br>CLICK / E pick up · RIGHT-CLICK / Q put item away · F3 debug · H get shot · G god mode</div>
+    <div id="dbg"></div>
+  </div>
+
+  <div id="touch"><div id="stickbase"><div id="stickknob"></div></div></div>
+  <div id="tbtns">
+    <button class="tb" data-act="inv" style="right:2cqw;top:2cqw">INV</button>
+    <button class="tb" data-act="put" style="right:12cqw;top:2cqw">PUT<br>AWAY</button>
+    <button class="tb sm" data-act="shot" style="right:22.5cqw;top:3.2cqw">GET<br>SHOT</button>
+    <button class="tb sm" data-act="console" style="right:38.5cqw;top:3.2cqw">CON</button>
+    <button class="tb sm" data-act="reset" style="right:30.5cqw;top:3.2cqw">RESET</button>
+    <button class="tb" data-act="pick" style="right:3cqw;bottom:5cqw;width:12cqw;height:12cqw;font-size:2.2cqw">TAKE</button>
+    <button class="tb" data-act="sprint" style="right:17cqw;bottom:3cqw">SPRINT</button>
+    <button class="tb" data-act="crouch" style="right:4.5cqw;bottom:20cqw">SNEAK</button>
+    <button class="tb" data-act="blink" style="right:17cqw;bottom:14.5cqw">BLINK</button>
+  </div>
+  <div id="inv">
+    <div id="invhint">Click &amp; drag to rearrange · drag outside the slots to drop · double-click to use</div>
+    <div id="slots"></div>
+    <div id="dropzone">TAB to close</div>
+  </div>
+  <img id="drag" alt="">
+
+  <div class="screen" id="start" style="display:flex">
+    <h1>SCP – CONTAINMENT BREACH</h1>
+    <h2>WEB PORT · SCP-173 CHAMBER · real room mesh, models, textures &amp; sounds from the repo</h2>
+    <div class="box touchonly">
+      <b>LEFT THUMB</b><span>drag anywhere on the left half to walk</span>
+      <b>RIGHT THUMB</b><span>drag to look &middot; tap to pick up what you face</span>
+      <b>TAKE</b><span>pick up the highlighted item</span>
+      <b>SPRINT / SNEAK / BLINK</b><span>hold &middot; tap &middot; hold</span>
+      <b>INV</b><span>10 slots: drag to move, drag off to drop, double-tap to use</span>
+    </div>
+    <div class="box desk">
+      <b>W A S D</b><span>move (diagonals as in the original)</span>
+      <b>SHIFT</b><span>sprint &mdash; drains stamina</span>
+      <b>C / CTRL</b><span>crouch</span>
+      <b>SPACE</b><span>blink (hold to keep eyes shut)</span>
+      <b>TAB</b><span>inventory (10 slots)</span>
+      <b>CLICK or E</b><span>pick up the highlighted item (walk up close and look at it)</span>
+      <b>RIGHT-CLICK or Q</b><span>put away the item in your hands</span>
+      <b>H · G · R · F3</b><span>get shot · god mode · reset · debug values</span>
+    </div>
+    <button class="btn" id="go" disabled>LOADING 0%</button>
+    <div id="lockwarn" style="margin-top:1.4cqw;font-size:1.2cqw;color:#8d8d8d;max-width:60cqw"></div>
+    <div class="legal">Port of gameplay logic from <a href="https://github.com/Regalis11/scpcb">github.com/Regalis11/scpcb</a> (SCP – Containment Breach, by Regalis / Undertow Games and contributors). Rooms, models, textures, sounds &amp; HUD artwork and the SCP-173 document image come from that repository.
+    Licensed CC BY-SA 3.0 &mdash; this port is released under the same license. Based on the work of the SCP Foundation community (scp-wiki.net). Unofficial fan port; not affiliated with the original developers.</div>
+  </div>
+
+  <div class="screen" id="pause">
+    <h1>PAUSED</h1>
+    <h2>The mouse was released</h2>
+    <button class="btn" id="resume">RESUME</button>
+  </div>
+
+  <div class="screen" id="dead">
+    <h1>YOU ARE DEAD</h1>
+    <div id="deadmsg"></div>
+    <button class="btn" id="respawn">RESET (R)</button>
+  </div>
+</div>
+<div id="rotate">Rotate your device<br>to landscape</div>
+</div>
+<style>
+  #con{position:absolute;left:0;right:0;top:0;height:46%;z-index:20;display:none;flex-direction:column;background:rgba(0,0,0,.82);border-bottom:.2cqw solid #888;font:1.7cqw/1.35 "Courier New",monospace;color:#ddd;-webkit-user-select:text;user-select:text;touch-action:auto}
+  #con.open{display:flex}
+  #conlog{flex:1;overflow-y:auto;padding:.8cqw 1.2cqw;white-space:pre-wrap;word-break:break-word}
+  #conlog .err{color:#f66}#conlog .ok{color:#8f8}#conlog .cmd{color:#fff}
+  #conrow{display:flex;border-top:.1cqw solid #555}
+  #conrow b{padding:.6cqw .8cqw;color:#8f8}
+  #conin{flex:1;background:transparent;border:0;outline:0;color:#fff;font:inherit;padding:.6cqw 0;-webkit-user-select:text;user-select:text}
+  #stage.touch #con{font-size:2.3cqw}
+</style>
+<div id="con"><div id="conlog"></div><div id="conrow"><b>&gt;</b><input id="conin" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div></div>
+
+<script src="js/engine.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
